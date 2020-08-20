@@ -1,0 +1,617 @@
+---
+title: "Projet TND"
+authors: "Alessandro Rinaudo(21701590) et Alberto Petrossi(21701689)"
+date: "4/21/2020"
+info : "Ce projet a été réalisé en binôme"
+output: html_document
+---
+
+# Partie 1 : Analyse descriptive
+
+## Question 1 
+### Téléchargement du jeu de données et chargement sur R
+```{r partie1.1}
+covid=read.csv("donnees_covid.csv", sep = ";")
+```
+
+## Question 2
+
+### Description du jeu de données :
+
+####  Dataframe contenant les donnéés avec 8 variables 
+#### -Maille_nom : nom des provinces françaises
+#### - Duree_jours : indique les jours 
+#### - Latitude : indique la latitude géographique
+#### - Longitude : indique la longitude géographique
+#### - Deces_total : indiquele nombre de déces totaux
+#### - Reanimation_jours : indique le nombre de patients en réanimation
+#### - Hospitalise_total : indique le nombre de patients hospitalises
+#### - Gueris_jours : indique le nombre de guéris
+
+### Calcul de la dimension
+```{r partie1.2.1}
+dim(covid)
+```
+
+### Nom variables
+```{r partie1.2.2}
+names(covid)
+```
+
+### Type variable 
+```{r partie1.2.3}
+typeof(covid)
+```
+
+### Statistiques générales 
+```{r partie1.2.4}
+summary(covid)
+```
+
+### Calcul de l'écart type 
+```{r partie1.2.5}
+apply (covid[,-1],2,sd)
+```
+
+### Diagramme en secteur
+```{r partie1.2.10}
+pie(table(covid$duree_jours))
+```
+
+### Réalisation boite à moustache
+```{r partie1.2.6}
+boxplot(covid[,-1])
+```
+
+### Réalisation histogrammes
+```{r partie1.2.7}
+hist(covid$duree_jours)
+hist(covid$latitude)
+hist(covid$longitude)
+hist(covid$deces_total)
+hist(covid$reanimation_total)
+hist(covid$hospitalises_total)
+hist(covid$gueris_total)
+```
+
+## Question 3
+
+### Affichage de la carte géographique 
+```{r partie1.3.1}
+#Loading stuff
+library(leaflet)
+```
+
+### Couleurs
+```{r partie1.3.1.2}
+mybins = seq(min(covid$deces_total), max(covid$deces_total), by=2000)
+mypalette = colorBin( palette = "YlOrRd", domain=covid$deces_total, na.color="transparent", bins=mybins)
+```
+
+### Preparation du texte pour la info-bulle:
+```{r partie1.3.1.3}
+mytext = paste(
+  "Deces totaux: ", covid$deces_total, "<br/>", 
+  "Reanimations totales : ", covid$reanimation_total, "<br/>", 
+  "Hospitalises totaux : ", covid$hospitalises_total, "<br/>",
+  "Gueris totaux : ", covid$gueris_total, sep = "") %>%
+  lapply(htmltools::HTML)
+```
+
+### Création de la carte
+```{r partie1.3.1.4}
+m = leaflet(covid) %>% 
+  addTiles()  %>% 
+  setView( lat=48, lng=2 , zoom=5) %>%
+  addProviderTiles("Esri.WorldImagery") %>%
+  addCircleMarkers(~longitude, ~latitude, 
+                  fillColor = ~mypalette(covid$deces_total), fillOpacity = 0.7, color="white", radius=8, stroke=FALSE,
+                   label = mytext,
+                   labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")
+  ) %>%
+  addLegend( pal=mypalette, values=~deces_total, opacity=0.9, title = "Nombre de morts", position = "bottomright" )
+
+m 
+```
+
+## Question 4 (Bonus)
+
+### Data
+```{r partie1.4.1}
+library(leaflet)
+library(leaflet.minicharts)
+library(dplyr)
+```
+
+### Création de la Map
+```{r partie1.4.2}
+
+tilesURL <- "http://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+basemap = leaflet(width = "100%", height = "400px") %>%
+  addTiles(tilesURL)
+
+
+```
+
+### Répartition du nombre de personnes décédées, en réanimation, guéries et hospitalisées (diagramme circulaire)
+```{r partie1.4.3}
+
+colors <- c("#dc2f0a", "#dc8f0a", "#0ad7dc", "#0adc0f")
+
+basemap %>%
+  addMinicharts(
+    covid$longitude, covid$latitude,
+    type = "pie",
+    chartdata = covid[,-c(1,2,3,4)], 
+    colorPalette = colors, 
+    #width = sqrt(covid$deces_total), 
+    transitionTime = 0
+  )
+```
+### Répartition du nombre de personnes décédées, en réanimation, guéries et hospitalisées (histogrammes)
+```{r partie1.4.4}
+statscovid <- covid %>% select(deces_total, reanimation_total, hospitalises_total, gueris_total)
+basemap %>%
+  addMinicharts(
+    covid$longitude, covid$latitude,
+    chartdata = statscovid,
+    colorPalette = colors,
+    width = 45, height = 45
+  )
+
+```
+### Nombre de morts par départements (variable simple)
+
+```{r partie1.4.5}
+basemap %>%
+  addMinicharts(
+    covid$longitude, covid$latitude,
+    chartdata = covid$deces_total,
+    showLabels = TRUE,
+    width = 45
+  )
+```
+
+# Partie 2 : Prédiction du nombre de décès
+
+## Question 1 
+
+### Calcul de la corrélation entre les variables "reanimation_total" , "hospitalisation_total" , "gueris_total"
+```{r partie2.1.1}
+cor(covid[,-c(1:5)])
+```
+
+### Affichage matrice de corrélation
+```{r partie2.1.1.2}
+#install.packages("corrplot")
+M=cor(covid[,-c(1:5)])
+library(corrplot)
+corrplot(M, method="circle")
+```
+
+## Question 2
+
+### Affichage nouages de points
+```{r partie2.2}
+plot(covid[c(5:6)])
+plot(covid$deces_total,covid$hospitalises_total)
+plot(covid$deces_total,covid$gueris_total)
+```
+
+#### Les variables qui permettent d'expliquer au mieux la variable à prédire sont les variables "hospitalises_total" et "reanimation_total", car elles permettent de se faire une idée sur le nombre potentiel de personnes décédées. 
+
+## Question 3
+
+### Division du jeu de données en deux sous-ensemble (80%-20%)
+```{r partie2.3}
+sample = sample.int(n = nrow(covid), size = floor(.80*nrow(covid)))
+apprentissage = covid[sample, ]
+test  = covid[-sample, ]
+
+
+```
+
+
+## Question 4
+
+### Régression linéaire entre les variables explicatives et la variable à expliquer
+```{r partie2.4}
+regLi = lm(deces_total~(reanimation_total + hospitalises_total + gueris_total), data = apprentissage)
+plot(regLi)
+```
+
+#### Sur le premier graphique (Residuals vs Fitted), on observe que les résidus sont dispersés de manière égale autour de la droite horizontale sans suivre une forme de fonction distincte. 
+
+#### Sur le deuxième graphique (Q-Q plot), on observe qu'il suit une ligne droite. 
+
+#### Sur le troisième graphique (Scale-Location), les points suivent une droite horizontale.
+
+#### Enfin, sur le quatrième graphique (Residuals vs Leverage) on constate que des valeurs se trouvent en dehors des limites (Cook's distance)
+
+
+## Question 5
+
+### Résultats obtenus
+
+#### D'après le graphique Residuals vs Fitted, le mode de régression est bon et il a une bonne capacité de généralisation.
+
+#### D'après le graphique Normal Q-Q, le modèle est bon puisque les points suivent une ligne droite.
+
+#### Tout comme pour le graphique Residuals vs Fitted, le graphique Scale-Location prouve que le modèle a une bonne généralisation.
+
+#### Enfin, le graphique Residuals vs Leverage montrent qu'il y a des valeurs qui ont une forte influence et qui devraient peut-être être retirées afin d'améliorer la droite de régression. 
+
+## Question 6
+
+### Création de la fonction MAE (Min Absolute Error) et MSE (Min Squared Error)
+```{r partie2.6}
+MAE = function(y_reel, y_est)
+{
+  val = abs(y_reel-y_est)
+  mae_cal = mean(val)
+  return(mae_cal)
+}
+
+MSE = function(y_reel, y_est)
+{
+  val = (y_reel-y_est)^2
+  mse_cal = mean(val)
+  return(mse_cal)
+}
+```
+
+### Calcul du MAE et MSE graçe à les fonctions crées précédemment
+```{r partie2.6.2}
+y_estime = predict(regLi)
+
+MAE(apprentissage$deces_total, y_estime)
+MAE(test$deces_total, y_estime)
+
+MSE(apprentissage$deces_total, y_estime)
+MSE(test$deces_total, y_estime)
+```
+
+## Question 7
+
+#### On observe que le résultat obtenu par la MAE sur l'ensemble d'apprentissage est inférieur au résultat obtenu par la MAE sur l'ensemble de test. En effet, la MAE  obtenue sur l'ensemble d'apprentissage est généralement inférieure à celle obtenue sur l'ensemble de test, puisque l'ensemble de test n'est pas vu par le modèle donc on s'attend généralement à ce que la MAE sur l'ensemble de test soit plus élevée.
+#### On observe que la MSE executée sur l'ensemble d'apprentissage donne un résultat bien inférieur à la MSE executée sur l'ensemble de test. On en déduit que le modèle est trop rempli car il y a une grande différence entre les deux MSE calculées : on est face à un modèle qui teste bien par échantillon, mais qui a une faible capacité à prédire lorsque testé en dehors d'un échantillon. 
+#### Par conséquent on en déduit que notre modèle peut prédire le nombre de décès pour un département donné avec une précision élevée, mais avec une faible précision pour l'ensemble des départements. 
+
+
+# Partie 3 : clustering des départements selon la dynamique de propagation du virus
+
+### L'objectif de cette partie est d'étudier la variabilité d'un tableau de données : 
+### À la fin de cette analyse on sera capable de associer ou dissocier de part les resemblances et les differences des données. On pourra faire émerger les caractéristiques de réponses et proposer une synthèse. 
+
+## Question 1
+
+```{r partie3.1}
+library(FactoMineR)
+
+covid.PCA = PCA(X = covid[,-1], ncp = 10)#création de l'ACP 
+#covid.PCA$eig
+barplot(covid.PCA$eig[,2])
+```
+
+#### - Le plan d'inertie maximum recueille environ 70% de l'inertie totale
+#### - Les variables 'gueris_total','hospitalies_total','reanimation_total','deces_total' sont corrélées positivement à la composante 1 (qu'on appellera C1) alors qu'elles sont très peu corrélées à la composante 2 (qu'on appelle C2) 
+#### - La variable 'duree_jour' est corrélée négativement à C1 et C2 
+#### - Les variables 'longitude' et 'latitude' sont peu corrélées à C1 et au contraire très corrélées a C2.
+#### - Si l'on considère les sous espaces décrivant les différents départements on peut en déduire que la composant 1 (C1) représente majoritairement le temps, puisque les décès les guérisons et les hospitalisations augmentent alors que la durée de la maladie diminue; la composante 2 (C2) décrit la capacité de contamination vu que cela dépend beaucoup de la zone d'infection mais elle n'est pas liée de manière significative ni à la durée des jours ni aux guérisons ou aux décès.
+
+
+## Question 2
+
+### Création de la variable deces_total
+```{r partie3.2}
+library(ggplot2)
+covid$deces_total=as.factor(covid$deces_total)
+```
+
+### Création du graphique coloré
+```{r partie3.2.2}
+sp = ggplot(covid, aes(x = latitude,y=longitude,color=deces_total)) + geom_point()
+sp
+```
+#### On remarque que le nombre plus important de décès a lieu sur le continent français puisque les points sont répartis le plus à l'est sur le graphique. 
+
+## Question 3
+```{r partie 3.3.1}
+library(cluster)
+
+covid_values = covid[,-1]
+
+ratio_ss = data.frame(cluster = seq(from = 1, to = 5, by = 1)) 
+for (k in 1:5) {
+  km_covid = kmeans(covid_values, k, nstart = 20)
+  ratio_ss$ratio[k] = km_covid$tot.withinss / km_covid$totss
+}
+
+ggplot(ratio_ss, aes(cluster, ratio)) + 
+geom_line() +
+geom_point()
+```
+
+#### On observe que le cluster se trouve entre 2 et 3. Donc on réalise deux k-means avec ces deux valeurs.
+
+### K-means
+```{r partie 3.3.2}
+km_covid = covid_values %>% 
+kmeans(centers = 2, nstart=20)
+covid_values$cluster = km_covid$cluster
+ggplot(covid_values, aes(x = deces_total, y = hospitalises_total, col = gueris_total)) + 
+geom_point(size = 2, alpha = 0.8, position = "jitter")
+
+km_covid = covid_values %>% 
+kmeans(centers = 3, nstart=20)
+covid_values$cluster = km_covid$cluster
+ggplot(covid_values, aes(x = deces_total, y = hospitalises_total, col = gueris_total)) + 
+geom_point(size = 2, alpha = 0.8, position = "jitter")
+```
+
+### CAH
+```{r partie 3.3.3}
+z = covid[, -c(1,1)]
+
+z.numeric = transform(z, duree_jours = as.numeric(duree_jours), deces_total = as.numeric(deces_total), reanimation_total = as.numeric(reanimation_total), hospitalises_total = as.numeric(hospitalises_total), gueris_total = as.numeric(gueris_total)) 
+```
+
+### On a converti le data frame en double
+```{r partie 3.3.3.2}
+
+z.scale = scale(z.numeric)
+
+distance = dist(z.scale, method = "euclidean")
+
+covid.ward = hclust(distance, method = "ward.D")
+covid.minimum = hclust(distance, method = "single")
+covid.maximum = hclust(distance, method = "complete")
+covid.moyen = hclust(distance, method = "average")
+```
+
+## Question 4
+```{r partie 3.3.4}
+plot(covid.ward, labels = covid$maille_nom)
+plot(covid.minimum, labels = covid$maille_nom)
+plot(covid.maximum, labels = covid$maille_nom)
+plot(covid.moyen, labels = covid$maille_nom)
+```
+
+## Question 5
+
+#### D'après l'analyse des résultats de la première partie on peut en déduire que toute la France métropolitaine a été touchée par l'épidémie. 
+#### D'après l'analyse de la deuxième partie, il est possible de prédire avec une bonne précision le nombre de morts pour chaque département en fonction des personnes en réanimation, hospitalisées et guéries, mais il est difficile de le prédire avec précision pour l'ensemble des départements.  
+#### D'après l'analyse de la troisième partie, le nombre de malades, de morts et de guéris augmente avec le temps. De plus, le CAH montre qu'il y a des données similaires entre plusieurs départements dans le jeu de données, mais on remarque que Paris présente des données différentes par rapport à celles des autres pays. 
+
+#### Ainsi on en déduit de ces analyses que l'ensemble de la France est touchée par le covid 19. Le nombre de morts, de malades et de guéris vont augmenter avec le temps, même s'il est difficile de prédire ces données avec précision pour l'ensemble des départements français. Enfin, plusieurs départements français se retrouvent dans une situation similaire, mais Paris se distingue d'eux par son nombre plus important de personnes touchées par le virus. 
+
+
+# Bonus :
+
+### Chargement du jeu de données Fatality
+
+```{r partie 4.1}
+Fatality=read.csv("Fatality.csv", sep = ",",row.names = "X")
+```
+
+### Élimination de toutes les variables quantitatives du jeu de données fatality: 
+```{r partie 4.2}
+fatalityStudy=Fatality[,-c(1:2)]
+Fatality= fatalityStudy[,-c(4:5)]
+rm(fatalityStudy)
+```
+
+### Subdivision du jeu de données en 3 sous groups
+```{r partie 4.3}
+group1=Fatality[c(1:122),]
+group2=Fatality[c(123:245),]
+group3=Fatality[-c(1:245),]
+```
+### Présentation du jeu :
+#### Le jeu de données qu'on va analyser est un dataframe contenent 48 observations concernants le trafic autoroutier des États Unis. Il se compose de 6 variables dont :
+#### - mrall : représente le taux des accidents de la route
+#### - beertax : représente la taxe en cas d'accident du à l'alcool (en particulier la bière)
+#### - mlda : représente l'age minimum pour boir
+#### - vmiles : représente la moyenne de miles par conducteur
+#### - unrate : représente le taux de chômage
+#### - pernic : représente le revenu par habitant
+
+
+## Interprétation des caractéristiques suivant l'ensemble des variables des différents dataframes
+
+#### Dimension de chaque groupe
+```{r partie 4.4.1}
+dim(group1)
+dim(group2)
+dim(group3)
+```
+
+```{r partie 4.4.2.1}
+plot(group1[c(2:3)])
+plot(group2[c(2:3)])
+plot(group3[c(2:3)])
+```
+
+### boxplot de chaque groupe
+```{r partie 4.4.2.2}
+boxplot(group1)
+boxplot(group2)
+boxplot(group3)
+```
+
+### Diagramme circulaire de chaque groupe
+```{r partie 4.4.3}
+pie(table(group1$mlda))
+pie(table(group2$mlda))
+pie(table(group3$mlda))
+```
+
+### Hist de chaque groupe
+```{r partie 4.4.3.1}
+hist(table(group1$mlda))
+hist(table(group1$beertax))
+hist(table(group2$mlda))
+hist(table(group2$beertax))
+hist(table(group3$mlda))
+hist(table(group3$beertax))
+```
+
+### Statistiques générales de chaque groupe
+```{r partie 4.4.4}
+summary(group1)
+summary(group2)
+summary(group3)
+```
+
+```{r partie CAH}
+
+distance1 = dist(group1, method = "euclidean")
+distance2 = dist(group2, method = "euclidean")
+distance3 = dist(group3, method = "euclidean")
+
+#CAH groupe 1
+group1.ward = hclust(distance1, method = "ward.D")
+group1.minimum = hclust(distance1, method = "single")
+group1.maximum = hclust(distance1, method = "complete")
+group1.moyen = hclust(distance1, method = "average")
+
+#CAH groupe 2
+group2.ward = hclust(distance2, method = "ward.D")
+group2.minimum = hclust(distance2, method = "single")
+group2.maximum = hclust(distance2, method = "complete")
+group2.moyen = hclust(distance2, method = "average")
+
+#CAH groupe 3
+group3.ward = hclust(distance3, method = "ward.D")
+group3.minimum = hclust(distance3, method = "single")
+group3.maximum = hclust(distance3, method = "complete")
+group3.moyen = hclust(distance3, method = "average")
+
+#Affichage des plots pour le groupe 1
+plot(group1.ward)
+plot(group1.minimum)
+plot(group1.maximum)
+plot(group1.moyen)
+
+#Affichage des plots pour le groupe 2
+plot(group2.ward)
+plot(group2.minimum)
+plot(group2.maximum)
+plot(group2.moyen)
+
+#Affichage des plots pour le groupe 3
+plot(group3.ward)
+plot(group3.minimum)
+plot(group3.maximum)
+plot(group3.moyen)
+
+```
+
+```{r partie K-means}
+
+#Groupe 1
+ratio_ss = data.frame(cluster = seq(from = 1, to = 5, by = 1)) 
+for (k in 1:5) {
+  km_group1 = kmeans(group1, k, nstart = 20)
+  ratio_ss$ratio[k] = km_group1$tot.withinss / km_group1$totss
+}
+
+ggplot(ratio_ss, aes(cluster, ratio)) + 
+geom_line() +
+geom_point()
+
+#Groupe 2
+ratio_ss = data.frame(cluster = seq(from = 1, to = 5, by = 1)) 
+for (k in 1:5) {
+  km_group2 = kmeans(group2, k, nstart = 20)
+  ratio_ss$ratio[k] = km_group2$tot.withinss / km_group2$totss
+}
+
+ggplot(ratio_ss, aes(cluster, ratio)) + 
+geom_line() +
+geom_point()
+
+#Groupe 3
+ratio_ss = data.frame(cluster = seq(from = 1, to = 5, by = 1)) 
+for (k in 1:5) {
+  km_group3 = kmeans(group3, k, nstart = 20)
+  ratio_ss$ratio[k] = km_group3$tot.withinss / km_group3$totss
+}
+
+ggplot(ratio_ss, aes(cluster, ratio)) + 
+geom_line() +
+geom_point()
+
+```
+
+#### On remarque que le cluster se trouve entre 2 et 3
+
+
+
+### Groupe 1
+
+#### Avec 2 comme centre
+```{r partie K-means 2.1}
+km_group1 = group1 %>% 
+kmeans(centers = 2, nstart=20)
+group1$cluster = km_group1$cluster
+ggplot(group1, aes(x = beertax, y = unrate, col = mrall)) + 
+geom_point(size = 2, alpha = 0.8, position = "jitter")
+```
+
+```{r partie K-means 2.2}
+#### Avec 3 comme centre
+km_group1 = group1 %>% 
+kmeans(centers = 3, nstart=20)
+group1$cluster = km_group1$cluster
+ggplot(group1, aes(x = beertax, y = unrate, col = mrall)) + 
+geom_point(size = 2, alpha = 0.8, position = "jitter")
+```
+
+
+### Groupe 2
+
+#### Avec 2 comme centre
+```{r partie K-means 2.3}
+km_group2 = group2 %>% 
+kmeans(centers = 2, nstart=20)
+group2$cluster = km_group2$cluster
+ggplot(group2, aes(x = beertax, y = unrate, col = mrall)) + 
+geom_point(size = 2, alpha = 0.8, position = "jitter")
+```
+
+#### Avec 3 comme centre
+```{r partie K-means 2.4}
+km_group2 = group2 %>% 
+kmeans(centers = 3, nstart=20)
+group2$cluster = km_group2$cluster
+ggplot(group2, aes(x = beertax, y = unrate, col = mrall)) + 
+geom_point(size = 2, alpha = 0.8, position = "jitter")
+```
+### Groupe 3
+
+#### Avec 2 comme centre
+```{r partie K-means 2.5}
+km_group3 = group3 %>% 
+kmeans(centers = 2, nstart=20)
+group3$cluster = km_group3$cluster
+ggplot(group3, aes(x = beertax, y = unrate, col = mrall)) + 
+geom_point(size = 2, alpha = 0.8, position = "jitter")
+```
+### Avec 3 comme centre
+```{r partie K-means 2.6}
+km_group3 = group3 %>% 
+kmeans(centers = 3, nstart=20)
+group3$cluster = km_group3$cluster
+ggplot(group3, aes(x = beertax, y = unrate, col = mrall)) + 
+geom_point(size = 2, alpha = 0.8, position = "jitter")
+```
+
+### ACP 
+```{r partie 4.4.5}
+library(FactoMineR)
+group1.PCA = PCA(X = group1, ncp = 10)
+group2.PCA = PCA(X = group2, ncp = 10)
+group3.PCA = PCA(X = group3, ncp = 10)
+```
+
